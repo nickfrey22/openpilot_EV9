@@ -6,7 +6,7 @@ from opendbc.can.packer import CANPacker
 from openpilot.selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance, apply_std_steer_angle_limits
 from openpilot.selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
-from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
+from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR, ANGLE_CONTROL_CAR
 from openpilot.selfdrive.car.interfaces import CarControllerBase
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -81,15 +81,16 @@ class CarController(CarControllerBase):
     # here is based on observations of the stock LKAS system when it's engaged
     # CS.out.steeringPressed and steeringTorque are based on the
     # STEERING_COL_TORQUE value
+    MAX_TORQUE = 200
     if not bool(CS.out.steeringPressed):
-      self.lkas_max_torque = 130
+      self.lkas_max_torque = MAX_TORQUE
     else:
       # Steering torque seems to be a different scale than applied torque, so we
       # calculate a percentage based on observed "max" values (~|1200| based on
       # MDPS STEERING_COL_TORQUE) and then apply that percentage to our normal
       # max torque
       driver_applied_torque_pct = min(abs(CS.out.steeringTorque) / 1200.0, 1.0)
-      self.lkas_max_torque = 130 - (driver_applied_torque_pct * 130)
+      self.lkas_max_torque = MAX_TORQUE - (driver_applied_torque_pct * MAX_TORQUE)
 
     if not CC.latActive:
       apply_angle = CS.out.steeringAngleDeg
@@ -131,7 +132,7 @@ class CarController(CarControllerBase):
     # CAN-FD platforms
     if self.CP.carFingerprint in CANFD_CAR:
       hda2 = self.CP.flags & HyundaiFlags.CANFD_HDA2
-      hda2_long = hda2 and self.CP.openpilotLongitudinalControl
+      #hda2_long = hda2 and self.CP.openpilotLongitudinalControl
 
       # steering control
       can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled,
@@ -144,7 +145,8 @@ class CarController(CarControllerBase):
                                                           self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING))
 
       # LFA and HDA icons
-      if self.frame % 5 == 0 and (not hda2 or hda2_long):
+      updateLfaIcons = (not hda2) or self.CP.carFingerprint in ANGLE_CONTROL_CAR
+      if self.frame % 5 == 0 and updateLfaIcons:
         can_sends.append(hyundaicanfd.create_lfahda_cluster(self.packer, self.CAN, CC.enabled))
 
       # blinkers
@@ -167,9 +169,11 @@ class CarController(CarControllerBase):
                                                 hud_control.leftLaneVisible, hud_control.rightLaneVisible,
                                                 left_lane_warning, right_lane_warning))
 
-      if not self.CP.openpilotLongitudinalControl:
+      #if not self.CP.openpilotLongitudinalControl:
+      #  can_sends.extend(self.create_button_messages(CC, CS, use_clu11=True))
+      if not self.CP.openpilotLongitudinalControl and self.CP.carFingerprint in CANFD_CAR:
         can_sends.extend(self.create_button_messages(CC, CS, use_clu11=True))
-
+        
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
         # TODO: unclear if this is needed
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
@@ -193,6 +197,7 @@ class CarController(CarControllerBase):
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.steerOutputCan = apply_steer
+    new_actuators.steeringAngleDeg = apply_angle
     new_actuators.accel = accel
 
     self.frame += 1
