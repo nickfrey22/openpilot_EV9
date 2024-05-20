@@ -97,6 +97,8 @@ class HyundaiFlags(IntFlag):
   CLUSTER_GEARS = 2 ** 21
   TCU_GEARS = 2 ** 22
 
+  ANGLE_CONTROL = 2 ** 26
+  
   MIN_STEER_32_MPH = 2 ** 23
 
 
@@ -501,7 +503,7 @@ class CAR(Platforms):
       HyundaiCarDocs("Kia EV9 2024", car_parts=CarParts.common([CarHarness.hyundai_r, Mount.angled_mount_8_degrees]))
     ],
     CarSpecs(mass=2625, wheelbase=3.1, steerRatio=16.02),
-    flags=HyundaiFlags.EV,
+    flags=HyundaiFlags.EV, | HyundaiFlags.ANGLE_CONTROL,
   )
 
   # Genesis
@@ -753,6 +755,8 @@ HYBRID_CAR = CAR.with_flags(HyundaiFlags.HYBRID)
 EV_CAR = CAR.with_flags(HyundaiFlags.EV)
 
 LEGACY_SAFETY_MODE_CAR = CAR.with_flags(HyundaiFlags.LEGACY)
+
+ANGLE_CONTROL_CAR = CAR.with_flags(HyundaiFlags.ANGLE_CONTROL)
 
 UNSUPPORTED_LONGITUDINAL_CAR = CAR.with_flags(HyundaiFlags.LEGACY) | CAR.with_flags(HyundaiFlags.UNSUPPORTED_LONGITUDINAL)
 
