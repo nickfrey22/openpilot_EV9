@@ -38,7 +38,7 @@ class CanBus(CanBusBase):
 def create_steering_messages(packer, CP, CAN, enabled, lat_active, steering_pressed, apply_steer, apply_angle, max_torque):
 
   ret = []
-
+if angle_control
   values = {
     "LKA_MODE": 0,
     "LKA_ICON": 2 if enabled else 1,
@@ -54,8 +54,19 @@ def create_steering_messages(packer, CP, CAN, enabled, lat_active, steering_pres
     # a torque scale value? ramps up when steering, highest seen is 234
     # "UNKNOWN": 50 if lat_active and not steering_pressed else 0,
     "UNKNOWN": max_torque if lat_active else 0,
-    "NEW_SIGNAL_3": 9,
   }
+  else:
+    values = {
+      "LKA_MODE": 2,
+      "LKA_ICON": 2 if enabled else 1,
+      "TORQUE_REQUEST": apply_steer,
+      "LKA_ASSIST": 0,
+      "STEER_REQ": 1 if lat_active else 0,
+      "STEER_MODE": 0,
+      "HAS_LANE_SAFETY": 0,  # hide LKAS settings
+      "NEW_SIGNAL_1": 0,
+      "NEW_SIGNAL_2": 0,
+    }
 
   if CP.flags & HyundaiFlags.CANFD_HDA2:
     hda2_lkas_msg = "LKAS_ALT" if CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING else "LKAS"
@@ -122,7 +133,7 @@ def create_acc_cancel(packer, CP, CAN, cruise_info_copy):
 def create_lfahda_cluster(packer, CAN, enabled):
   values = {
     "HDA_ICON": 1 if enabled else 0,
-    "LFA_ICON": 3 if enabled else 0,
+    "LFA_ICON": 2 if enabled else 0,
   }
   return packer.make_can_msg("LFAHDA_CLUSTER", CAN.ECAN, values)
 
