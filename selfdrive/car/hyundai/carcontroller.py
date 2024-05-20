@@ -81,16 +81,15 @@ class CarController(CarControllerBase):
     # here is based on observations of the stock LKAS system when it's engaged
     # CS.out.steeringPressed and steeringTorque are based on the
     # STEERING_COL_TORQUE value
-    MAX_TORQUE = 200
     if not bool(CS.out.steeringPressed):
-      self.lkas_max_torque = MAX_TORQUE
-    else:
+       ego_weight = interp(CS.out.vEgo, [8.3, 35.6], [0.5, 1.5])
+       self.lkas_max_torque = min(200, self.lkas_max_torque + (CS.out.vEgo*3.6), interp(abs(apply_angle), [5, 30], [110, 200]) * ego_weight)
+          else:
       # Steering torque seems to be a different scale than applied torque, so we
       # calculate a percentage based on observed "max" values (~|1200| based on
       # MDPS STEERING_COL_TORQUE) and then apply that percentage to our normal
       # max torque
-      driver_applied_torque_pct = min(abs(CS.out.steeringTorque) / 1200.0, 1.0)
-      self.lkas_max_torque = MAX_TORQUE - (driver_applied_torque_pct * MAX_TORQUE)
+      self.lkas_max_torque = max(10, self.lkas_max_torque - self.lkas_max_torque*0.2)
 
     if not CC.latActive:
       apply_angle = CS.out.steeringAngleDeg
@@ -142,7 +141,7 @@ class CarController(CarControllerBase):
       # prevent LFA from activating on HDA2 by sending "no lane lines detected" to ADAS ECU
       if self.frame % 5 == 0 and hda2:
         can_sends.append(hyundaicanfd.create_suppress_lfa(self.packer, self.CAN, CS.hda2_lfa_block_msg,
-                                                          self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING))
+                                                          self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING, CC.enabled))
 
       # LFA and HDA icons
       updateLfaIcons = (not hda2) or self.CP.carFingerprint in ANGLE_CONTROL_CAR
